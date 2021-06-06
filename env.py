@@ -4,9 +4,10 @@ import matplotlib.pyplot as plt
 
 
 class StockEnv:
-    def __init__(self, ts_window, start_date='20100101', end_date='20190101', lookbacks=-1):
+    def __init__(self, ts_window, start_date='20100101', end_date='20190101', lookbacks=-1, ic_coef=0.1):
         self.ts_window = ts_window
         lookbacks = self.ts_window if lookbacks < 0 else lookbacks
+        self.ic_coef = ic_coef
         self.__init_market_data(start_date, end_date, lookbacks)
         self.reset()
 
@@ -45,7 +46,7 @@ class StockEnv:
         else:
             ic = np.corrcoef(target_rets, actions)[0, 1]
 
-        rewards = target_rets*actions
+        rewards = target_rets*actions + self.ic_coef * ic
         pnl = np.mean(rewards)
 
         today_ret = self.univ.iloc[self.today, :][self.valid_stocks].values
@@ -101,8 +102,8 @@ class StockEnv:
 
 
 if __name__ == '__main__':
-    ts_window = 10
-    env = StockEnv(ts_window, start_date='20100101', end_date='20190101')
+    ts_window = 100
+    env = StockEnv(ts_window, start_date='20120101', end_date='20190101')
 
     state = env.reset()
     #reward_ls = []

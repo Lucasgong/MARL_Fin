@@ -106,13 +106,24 @@ def hard_update(q_network, target_q_network):
         t_param.data.copy_(new_param)
 
 
-def test(agent, start_date, end_date, params):
+def test_agent(agent, params, start_date='20190102', end_date='20210603'):
     test_env = StockEnv(ts_window=params.ts_window, start_date=start_date, end_date=end_date)
+    state = test_env.reset()
+    while True:
+        action = agent.act(state, epsilon=0)
+        next_state, reward, done, info = test_env.step(action.cpu().numpy())
+        reward *= params.reward_scale
+        state = info
+        if done.all():
+            print("\nResults on test dataset:")
+            test_env.stats()
+            print("")
+            break
 
 
 
 def run_gym(params):
-    env = StockEnv(ts_window=30, start_date='20100101', end_date='20190101')
+    env = StockEnv(ts_window=params.ts_window, start_date='20100101', end_date='20190101')
     q_network = DQN(num_stocks=params.ticker_num, num_days=params.ts_window)
     target_q_network = deepcopy(q_network)
 
@@ -163,6 +174,7 @@ def run_gym(params):
             if len(losses) > 0:
                 out_str += ", TD Loss: {}".format(losses[-1])
             print(out_str)
+            test_agent(agent, params)
 
 
 if __name__ == "__main__":
@@ -180,7 +192,7 @@ if __name__ == "__main__":
     parser.add_argument("--log_every", type=int, default=1000)
     parser.add_argument("--target_network_update_f", type=int, default=1000)
     parser.add_argument("--ticker_num", type=int, default=10)
-    parser.add_argument("--ts_window", type=int, default=30)
+    parser.add_argument("--ts_window", type=int, default=252)
     parser.add_argument("--reward_scale", type=float, default=1.0)
     parser.add_argument("--update_every", type=int, default=1)
     parser.add_argument("--gradient_step", type=int, default=1)
