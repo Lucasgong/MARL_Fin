@@ -48,8 +48,7 @@ else:
 
 
 class Agent:
-    def __init__(self, env, q_network, target_q_network, lr):
-        self.env = env
+    def __init__(self, q_network, target_q_network, lr):
         self.q_network = q_network
         self.target_q_network = target_q_network
         self.num_actions = 3
@@ -151,20 +150,22 @@ def hard_update(q_network, target_q_network):
         t_param.data.copy_(new_param)
 
 
-def test_agent(test_env, agent, agent_id, params):
+def test_agent(test_env, agent_ls, agent_id, params):
     state = test_env.reset()
+
     while True:
-        action = agent.act(state, epsilon=0)
-        next_state, reward, done, info = test_env.step(action.cpu().numpy())
-        reward *= params.reward_scale
-        state = info
+        for idx, agent in enumerate(agent_ls):
+            action = agent.act(state, epsilon=0)
+            _, _, done, _ = test_env.predict(action.cpu().numpy(),
+                                             agent_id=idx)
         if done.all():
-            print(f"test agent{agent_id}:")
+            print('test')
             test_env.stats()
             break
+        state = test_env.step()
 
 
-def make_agent(env, params):
+def make_agent(params):
     q_network = DQN(num_days=params.ts_window, hidden_dims=params.hidden_dims)
     target_q_network = deepcopy(q_network)
 
@@ -172,7 +173,7 @@ def make_agent(env, params):
         q_network = q_network.to(device)
         target_q_network = target_q_network.to(device)
 
-    agent = Agent(env, q_network, target_q_network, lr=params.learning_rate)
+    agent = Agent(q_network, target_q_network, lr=params.learning_rate)
 
     return agent
 
@@ -180,16 +181,13 @@ def make_agent(env, params):
 def run_gym(params):
     env = StockEnv(ts_window=params.ts_window,
                    start_date='20100101',
-                   end_date='20190101')
-
+                   end_date='20190101',
+                   agent_num=params.agent_num)
     test_env = StockEnv(ts_window=params.ts_window,
                         start_date='20190102',
-                        end_date='20210603')
-
-    agent_ls = [
-        make_agent(deepcopy(env), params) for i in range(params.agent_num)
-    ]
-    del env
+                        end_date='20210603',
+                        agent_num=params.agent_num)
+    agent_ls = [make_agent(params) for i in range(params.agent_num)]
 
     global_optimizer = optim.Adam([{
         'params': agent.q_network.parameters()
@@ -201,7 +199,7 @@ def run_gym(params):
     losses, all_rewards = [], []
     episode_reward = 0
 
-    state = [agent.env.reset() for agent in agent_ls][0]
+    state = env.reset()
     # state shape: [num_stocks, ts_window]
 
     for ts in range(1, params.max_ts + 1):
@@ -209,21 +207,21 @@ def run_gym(params):
         epsilon = get_epsilon(params.epsilon_start, params.epsilon_end,
                               params.epsilon_decay, ts)
 
-        for agent in agent_ls:
+        for idx, agent in enumerate(agent_ls):
             action = agent.act(state, epsilon)
-            next_state, reward, done, info = agent.env.step(
-                action.cpu().numpy())
+            next_state, reward, done, _ = env.predict(action.cpu().numpy(),
+                                                      agent_id=idx)
             reward *= params.reward_scale
             replay_buffer.push_batch(state, action, reward, next_state, done)
             episode_reward += reward.mean()
 
-        state = info
-
         if done.all():
-            [agent.env.stats() for agent in agent_ls]
-            state = [agent.env.reset() for agent in agent_ls][0]
+            env.stats()
+            state = env.reset()
             all_rewards.append(episode_reward / params.agent_num)
             episode_reward = 0
+
+        state = env.step()
 
         if len(replay_buffer
                ) > params.start_train_ts and ts % params.update_every == 0:
@@ -254,8 +252,7 @@ def run_gym(params):
                 out_str += ", TD Loss: {}".format(losses[-1])
             print(out_str)
 
-            for idx, agent in enumerate(agent_ls):
-                test_agent(test_env, agent, idx, params)
+            test_agent(test_env, agent_ls, idx, params)
             print('------------------')
 
 

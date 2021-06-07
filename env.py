@@ -9,22 +9,25 @@ class StockEnv:
                  start_date='20100101',
                  end_date='20190101',
                  lookbacks=-1,
-                 ic_coef=10):
+                 ic_coef=10,
+                 agent_num=1):
         self.ts_window = ts_window
         lookbacks = self.ts_window if lookbacks < 0 else lookbacks
         self.ic_coef = ic_coef
+        self.agent_num = agent_num
         self.__init_market_data(start_date, end_date, lookbacks)
         self.reset()
 
     def reset(self):
         self.today = self.ts_window
         self.infos = []
-        self.pnl = pd.Series(dtype=np.float64)
-        self.gen_valid_stocks()
+        self.pnl = pd.DataFrame(dtype=np.float64,
+                                columns=range(self.agent_num))
+        self.gen_valid_info()
 
         return self.valid_states
 
-    def gen_valid_stocks(self):
+    def gen_valid_info(self):
         state = self.univ.iloc[self.today -
                                self.ts_window:self.today, :].copy()
         valid = self.valid.iloc[self.today - 1, :] & (state.notna().sum()
@@ -33,19 +36,6 @@ class StockEnv:
         self.valid_states = state.values.T
         self.valid_stocks = state.columns
 
-    def step(self, nonnegative_action):
-        '''
-        nonnegative_action \in [0,1,2]
-        '''
-        try:
-            assert nonnegative_action.shape == (len(self.valid_stocks), )
-        except AssertionError as e:
-            print(nonnegative_action.shape)
-            print(len(self.valid_stocks))
-            raise e
-
-        actions = nonnegative_action - 1
-
         target_rets = self.univ.iloc[self.today +
                                      1, :][self.valid_stocks].values
         done = np.array([pd.isna(ret) for ret in target_rets])
@@ -53,27 +43,37 @@ class StockEnv:
             done = np.array([True] * len(done))
         target_rets = np.nan_to_num(target_rets, 0)
 
+        today_ret = self.univ.iloc[self.today, :][self.valid_stocks].values
+        today_ret = np.nan_to_num(today_ret, 0)
+
+        self.next_states = np.concatenate(
+            [self.valid_states[:, 1:], today_ret[:, np.newaxis]], axis=1)
+        self.done = done
+        self.target_rets = target_rets
+
+    def predict(self, nonnegative_action, agent_id=0,need_next_state=True):
+        assert nonnegative_action.shape == (len(self.valid_stocks), )
+
+        actions = nonnegative_action - 1
+
         if actions.std() == 0:
             ic = 0
         else:
-            ic = np.corrcoef(target_rets, actions)[0, 1]
+            ic = np.corrcoef(self.target_rets, actions)[0, 1]
 
-        rewards = target_rets * actions + self.ic_coef * ic
+        rewards = self.target_rets * actions + self.ic_coef * ic
         pnl = np.mean(rewards)
 
-        today_ret = self.univ.iloc[self.today, :][self.valid_stocks].values
-        today_ret = np.nan_to_num(today_ret, 0)
-        next_states = np.concatenate(
-            [self.valid_states[:, 1:], today_ret[:, np.newaxis]], axis=1)
+        tradeday = self.tradedays[self.today + 1]
+        self.pnl.loc[pd.to_datetime(tradeday, format='%Y%m%d'), agent_id] = pnl
 
+        return self.next_states, rewards, self.done, []
+
+    def step(self):
         self.today += 1
-        self.gen_valid_stocks()
+        self.gen_valid_info()
 
-        tradeday = self.tradedays[self.today]
-        info = self.valid_states
-        self.pnl[pd.to_datetime(tradeday, format='%Y%m%d')] = pnl
-
-        return next_states, rewards, done, info
+        return self.valid_states
 
     def render(self):
         self.pnl.cumsum().plot()
@@ -82,7 +82,9 @@ class StockEnv:
     def stats(self):
         ann_pnl = self.pnl.mean() * 252
         sharpe = (self.pnl.mean() - 0) / (self.pnl.std() + 1e-8) * np.sqrt(252)
-        print(f'annret:{ann_pnl},sharpe:{sharpe}')
+        for i in range(self.agent_num):
+            print(
+                f'agent{i}:  annret:{ann_pnl[i]:.3f},  sharpe:{sharpe[i]:.3f}')
 
     def __init_market_data(self, start_date, end_date, lookbacks):
 
@@ -116,15 +118,21 @@ class StockEnv:
 
 if __name__ == '__main__':
     ts_window = 100
-    env = StockEnv(ts_window, start_date='20120101', end_date='20190101')
+    agent_num = 4
+    env = StockEnv(ts_window,
+                   start_date='20120101',
+                   end_date='20190101',
+                   agent_num=agent_num)
 
     state = env.reset()
     #reward_ls = []
     while True:
-        action = 2 * np.ones(state.shape[0])
-        next_state, reward, terminated, state = env.step(action)
-
+        for idx in range(agent_num):
+            action = 2 * np.ones(state.shape[0])
+            next_state, reward, terminated, _ = env.predict(action, idx)
         if terminated.all():
             break
+        state = env.step()
+
     env.stats()
     env.render()
