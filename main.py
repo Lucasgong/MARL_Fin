@@ -124,7 +124,7 @@ def test_agent(agent, params, start_date='20190102', end_date='20210603'):
 
 def run_gym(params):
     env = StockEnv(ts_window=params.ts_window, start_date='20100101', end_date='20190101')
-    q_network = DQN(num_stocks=params.ticker_num, num_days=params.ts_window)
+    q_network = DQN(num_stocks=params.ticker_num, num_days=params.ts_window, hidden_dims=params.hidden_dims)
     target_q_network = deepcopy(q_network)
 
     if USE_CUDA:
@@ -192,8 +192,9 @@ if __name__ == "__main__":
     parser.add_argument("--log_every", type=int, default=1000)
     parser.add_argument("--target_network_update_f", type=int, default=1000)
     parser.add_argument("--ticker_num", type=int, default=10)
-    parser.add_argument("--ts_window", type=int, default=252)
+    parser.add_argument("--ts_window", type=int, default=14)
     parser.add_argument("--reward_scale", type=float, default=1.0)
     parser.add_argument("--update_every", type=int, default=1)
     parser.add_argument("--gradient_step", type=int, default=1)
+    parser.add_argument("--hidden_dims", type=tuple, default=(256, 256))
     run_gym(parser.parse_args())

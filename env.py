@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 
 class StockEnv:
-    def __init__(self, ts_window, start_date='20100101', end_date='20190101', lookbacks=-1, ic_coef=0.1):
+    def __init__(self, ts_window, start_date='20100101', end_date='20190101', lookbacks=-1, ic_coef=10):
         self.ts_window = ts_window
         lookbacks = self.ts_window if lookbacks < 0 else lookbacks
         self.ic_coef = ic_coef

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from collections import OrderedDict
 
 
 class CnnDQN(nn.Module):
@@ -33,18 +34,19 @@ class CnnDQN(nn.Module):
 
 
 class DQN(nn.Module):
-    def __init__(self, num_stocks, num_days, num_actions=3):
+    def __init__(self, num_stocks, num_days, hidden_dims=(256, 256), num_actions=3):
         super(DQN, self).__init__()
         self.input_shape = num_days
         self.num_stocks = num_stocks
         self.num_actions = num_actions
-        self.layers = nn.Sequential(
-            nn.Linear(self.input_shape, 256),
-            nn.ReLU(),
-            nn.Linear(256, 256),
-            nn.ReLU(),
-            nn.Linear(256, num_actions)
-        )
+        self.layers = nn.Sequential(OrderedDict([
+            ("fc0", nn.Linear(self.input_shape, hidden_dims[0])),
+            ("relu0", nn.ReLU())
+        ]))
+        for i in range(len(hidden_dims)-1):
+            self.layers.add_module("fc"+str(i+1), nn.Linear(hidden_dims[i], hidden_dims[i+1]))
+            self.layers.add_module("relu"+str(i+1), nn.ReLU())
+        self.layers.add_module("fc"+str(len(hidden_dims)), nn.Linear(hidden_dims[-1], num_actions))
 
     def forward(self, x):
         return self.layers(x)
