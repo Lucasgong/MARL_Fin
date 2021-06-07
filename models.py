@@ -34,10 +34,9 @@ class CnnDQN(nn.Module):
 
 
 class DQN(nn.Module):
-    def __init__(self, num_stocks, num_days, hidden_dims=(256, 256), num_actions=3):
+    def __init__(self,  num_days, hidden_dims=(256, 256), num_actions=3):
         super(DQN, self).__init__()
         self.input_shape = num_days
-        self.num_stocks = num_stocks
         self.num_actions = num_actions
         self.layers = nn.Sequential(OrderedDict([
             ("fc0", nn.Linear(self.input_shape, hidden_dims[0])),
