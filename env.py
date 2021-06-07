@@ -4,7 +4,12 @@ import matplotlib.pyplot as plt
 
 
 class StockEnv:
-    def __init__(self, ts_window, start_date='20100101', end_date='20190101', lookbacks=-1, ic_coef=10):
+    def __init__(self,
+                 ts_window,
+                 start_date='20100101',
+                 end_date='20190101',
+                 lookbacks=-1,
+                 ic_coef=10):
         self.ts_window = ts_window
         lookbacks = self.ts_window if lookbacks < 0 else lookbacks
         self.ic_coef = ic_coef
@@ -22,8 +27,8 @@ class StockEnv:
     def gen_valid_stocks(self):
         state = self.univ.iloc[self.today -
                                self.ts_window:self.today, :].copy()
-        valid = self.valid.iloc[self.today-1,
-                                :] & (state.notna().sum() == self.ts_window)
+        valid = self.valid.iloc[self.today - 1, :] & (state.notna().sum()
+                                                      == self.ts_window)
         state = state.loc[:, valid]
         self.valid_states = state.values.T
         self.valid_stocks = state.columns
@@ -32,13 +37,20 @@ class StockEnv:
         '''
         nonnegative_action \in [0,1,2]
         '''
-        assert nonnegative_action.shape == (len(self.valid_stocks),)
+        try:
+            assert nonnegative_action.shape == (len(self.valid_stocks), )
+        except AssertionError as e:
+            print(nonnegative_action.shape)
+            print(len(self.valid_stocks))
+            raise e
+
         actions = nonnegative_action - 1
 
-        target_rets = self.univ.iloc[self.today+1, :][self.valid_stocks].values
+        target_rets = self.univ.iloc[self.today +
+                                     1, :][self.valid_stocks].values
         done = np.array([pd.isna(ret) for ret in target_rets])
         if self.today == (self.endday - 2):
-            done = np.array([True]*len(done))
+            done = np.array([True] * len(done))
         target_rets = np.nan_to_num(target_rets, 0)
 
         if actions.std() == 0:
@@ -46,7 +58,7 @@ class StockEnv:
         else:
             ic = np.corrcoef(target_rets, actions)[0, 1]
 
-        rewards = target_rets*actions + self.ic_coef * ic
+        rewards = target_rets * actions + self.ic_coef * ic
         pnl = np.mean(rewards)
 
         today_ret = self.univ.iloc[self.today, :][self.valid_stocks].values
@@ -68,8 +80,8 @@ class StockEnv:
         plt.show()
 
     def stats(self):
-        ann_pnl = self.pnl.mean()*252
-        sharpe = (self.pnl.mean()-0)/(self.pnl.std()+1e-8)*np.sqrt(252)
+        ann_pnl = self.pnl.mean() * 252
+        sharpe = (self.pnl.mean() - 0) / (self.pnl.std() + 1e-8) * np.sqrt(252)
         print(f'annret:{ann_pnl},sharpe:{sharpe}')
 
     def __init_market_data(self, start_date, end_date, lookbacks):
@@ -80,14 +92,14 @@ class StockEnv:
         valid = pd.read_csv('data/top1500.csv', index_col=0, sep='|')
 
         start_idx = valid.index.searchsorted(start_date)
-        start_idx = max(start_idx-lookbacks, 0)
+        start_idx = max(start_idx - lookbacks, 0)
         end_idx = valid.index.searchsorted(end_date)
         end_idx = end_idx + 1 if valid.index[end_idx] == end_date else end_idx
 
         valid = valid.iloc[start_idx:end_idx, :]
 
         ret = pd.read_csv('data/cps.csv', index_col=0,
-                          sep='|').pct_change()*100
+                          sep='|').pct_change() * 100
         ret = ret.iloc[start_idx:end_idx, :]
         ret.dropna(axis=1, how='all', inplace=True)
         ret.dropna(axis=0, how='all', inplace=True)
@@ -98,7 +110,8 @@ class StockEnv:
         self.valid = valid.loc[self.tradedays, self.tickers].astype(bool)
         self.univ = ret
         print(
-            f'init env:firstday:{self.tradedays[self.ts_window]} tradedays:{len(self.tradedays)},tickers:{len(self.tickers)}')
+            f'init env:firstday:{self.tradedays[self.ts_window]} tradedays:{len(self.tradedays)},tickers:{len(self.tickers)}'
+        )
 
 
 if __name__ == '__main__':

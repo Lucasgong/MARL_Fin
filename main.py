@@ -57,8 +57,8 @@ class Agent:
 
     def act(self, state, epsilon):
         """DQN action - max q-value w/ epsilon greedy exploration."""
+        state = torch.tensor(np.float32(state)).to(device)
         if random.random() > epsilon:
-            state = torch.tensor(np.float32(state)).to(device)
             q_value = self.q_network.forward(state)
             return q_value.max(1)[1].data
         return torch.randint(low=0, high=3,
@@ -118,7 +118,7 @@ def compute_global_loss(agent_ls, batch_size, replay_buffer, global_optimizer,
     global_loss = torch.tensor(0.0).to(device)
     for corr in corrcoef_ls:
         global_loss += corr
-
+    global_loss *= global_loss_scale
     #global_loss = global_loss_scale * torch.tensor(corrcoef_ls)
 
     global_optimizer.zero_grad()
@@ -201,8 +201,8 @@ def run_gym(params):
     losses, all_rewards = [], []
     episode_reward = 0
 
-    state = [agent.env.reset()
-             for agent in agent_ls][0]  # state shape: [num_stocks, ts_window]
+    state = [agent.env.reset() for agent in agent_ls][0]
+    # state shape: [num_stocks, ts_window]
 
     for ts in range(1, params.max_ts + 1):
 
@@ -221,7 +221,7 @@ def run_gym(params):
 
         if done.all():
             [agent.env.stats() for agent in agent_ls]
-            state = [agent.env.reset() for agent in agent_ls]
+            state = [agent.env.reset() for agent in agent_ls][0]
             all_rewards.append(episode_reward / params.agent_num)
             episode_reward = 0
 
@@ -256,6 +256,7 @@ def run_gym(params):
 
             for idx, agent in enumerate(agent_ls):
                 test_agent(test_env, agent, idx, params)
+            print('------------------')
 
 
 if __name__ == "__main__":
