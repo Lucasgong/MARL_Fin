@@ -51,7 +51,7 @@ class StockEnv:
         self.done = done
         self.target_rets = target_rets
 
-    def predict(self, nonnegative_action, agent_id=0,need_next_state=True):
+    def predict(self, nonnegative_action, agent_id=0):
         assert nonnegative_action.shape == (len(self.valid_stocks), )
 
         actions = nonnegative_action - 1

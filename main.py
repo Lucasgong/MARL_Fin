@@ -1,26 +1,5 @@
 #!/usr/bin/env python3
-"""
-Usage:
-
-$ . ~/env/bin/activate
-
-Example pong command (~900k ts solve):
-    python main.py \
-        --env "PongNoFrameskip-v4" --CnnDQN --learning_rate 0.00001 \
-        --target_update_rate 0.1 --replay_size 100000 --start_train_ts 10000 \
-        --epsilon_start 1.0 --epsilon_end 0.01 --epsilon_decay 30000 --max_ts 1400000 \
-        --batch_size 32 --gamma 0.99 --log_every 10000
-
-Example cartpole command (~8k ts to solve):
-    python main.py \
-        --env "CartPole-v0" --learning_rate 0.001 --target_update_rate 0.1 \
-        --replay_size 5000 --starts_train_ts 32 --epsilon_start 1.0 --epsilon_end 0.01 \
-        --epsilon_decay 500 --max_ts 10000 --batch_size 32 --gamma 0.99 --log_every 200
-"""
-
 import argparse
-from functools import reduce
-import itertools
 import math
 import random
 from copy import deepcopy
@@ -28,7 +7,6 @@ from copy import deepcopy
 import numpy as np
 import torch
 import torch.optim as optim
-from torch.optim import optimizer
 
 from env import StockEnv
 from helpers import ReplayBuffer
@@ -118,7 +96,6 @@ def compute_global_loss(agent_ls, batch_size, replay_buffer, global_optimizer,
     for corr in corrcoef_ls:
         global_loss += corr
     global_loss *= global_loss_scale
-    #global_loss = global_loss_scale * torch.tensor(corrcoef_ls)
 
     global_optimizer.zero_grad()
     global_loss.backward()
@@ -150,7 +127,7 @@ def hard_update(q_network, target_q_network):
         t_param.data.copy_(new_param)
 
 
-def test_agent(test_env, agent_ls, agent_id, params):
+def test_agent(test_env, agent_ls):
     state = test_env.reset()
 
     while True:
@@ -252,7 +229,7 @@ def run_gym(params):
                 out_str += ", TD Loss: {}".format(losses[-1])
             print(out_str)
 
-            test_agent(test_env, agent_ls, idx, params)
+            test_agent(test_env, agent_ls)
             print('------------------')
 
 
