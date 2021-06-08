@@ -85,6 +85,7 @@ class StockEnv:
         for i in range(self.agent_num):
             print(
                 f'agent{i}:  annret:{ann_pnl[i]:.3f},  sharpe:{sharpe[i]:.3f}')
+        print(self.pnl.corr())
 
     def __init_market_data(self, start_date, end_date, lookbacks):
 
@@ -135,4 +136,4 @@ if __name__ == '__main__':
         state = env.step()
 
     env.stats()
-    env.render()
+    #env.render()
