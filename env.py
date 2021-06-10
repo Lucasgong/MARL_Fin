@@ -1,16 +1,24 @@
+import logging
+from os import name
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 
 class StockEnv:
     def __init__(self,
                  ts_window,
+                 logger,
                  start_date='20100101',
                  end_date='20190101',
                  lookbacks=-1,
                  ic_coef=10,
-                 agent_num=1):
+                 agent_num=1,
+                 name='test'):
+
+        self.name = name
+        self.logger = logger
         self.ts_window = ts_window
         lookbacks = self.ts_window if lookbacks < 0 else lookbacks
         self.ic_coef = ic_coef
@@ -61,11 +69,12 @@ class StockEnv:
         else:
             ic = np.corrcoef(self.target_rets, actions)[0, 1]
 
-        rewards = self.target_rets * actions + self.ic_coef * ic
-        pnl = np.mean(rewards)
-
+        rewards = self.target_rets * actions
+        pnl = rewards.sum() / (1e-8 + abs(actions).sum())
         tradeday = self.tradedays[self.today + 1]
         self.pnl.loc[pd.to_datetime(tradeday, format='%Y%m%d'), agent_id] = pnl
+
+        rewards += self.ic_coef * ic
 
         return self.next_states, rewards, self.done, []
 
@@ -82,10 +91,11 @@ class StockEnv:
     def stats(self):
         ann_pnl = self.pnl.mean() * 252
         sharpe = (self.pnl.mean() - 0) / (self.pnl.std() + 1e-8) * np.sqrt(252)
-        for i in range(self.agent_num):
-            print(
-                f'agent{i}:  annret:{ann_pnl[i]:.3f},  sharpe:{sharpe[i]:.3f}')
-        print(self.pnl.corr())
+        for i, name in enumerate(self.pnl.columns):
+            self.logger.info(
+                f'{name}:  annret:{ann_pnl[name]:.3f},  sharpe:{sharpe[name]:.3f}'
+            )
+        self.logger.info(self.pnl.corr())
 
     def __init_market_data(self, start_date, end_date, lookbacks):
 
@@ -112,15 +122,25 @@ class StockEnv:
         self.tickers = ret.columns
         self.valid = valid.loc[self.tradedays, self.tickers].astype(bool)
         self.univ = ret
-        print(
+        self.logger.info(
             f'init env:firstday:{self.tradedays[self.ts_window]} tradedays:{len(self.tradedays)},tickers:{len(self.tickers)}'
         )
 
 
 if __name__ == '__main__':
-    ts_window = 100
+
+    logger = logging.getLogger()
+
+    level = logging.INFO
+    logger.setLevel(level)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(level)
+    logger.addHandler(console_handler)
+
+    ts_window = 10
     agent_num = 4
     env = StockEnv(ts_window,
+                   logger=logger,
                    start_date='20120101',
                    end_date='20190101',
                    agent_num=agent_num)

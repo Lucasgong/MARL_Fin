@@ -1,3 +1,4 @@
+/home/zpgong/RL/MARL_Fin/main.py
 #!/usr/bin/env python3
 import argparse
 import logging
@@ -83,7 +84,7 @@ class Agent:
         # print("Model has been saved...")
 
     def load(self, agent_id, save_dir):
-        self.q_network.load_state_dict(
+        self.q_network = torch.load_state_dict(
             torch.load(f'{save_dir}/model/agent_{agent_id}.pth'))
         self.target_q_network = deepcopy(self.q_network)
         # print("Model has been loaded...")
@@ -193,6 +194,7 @@ def test_portfolio(train_env, test_env, agent_ls, logger):
     for env in [train_env, test_env]:
         state = env.reset()
         while True:
+
             with torch.no_grad():
                 q_values = [
                     agent.q_network(
@@ -208,12 +210,10 @@ def test_portfolio(train_env, test_env, agent_ls, logger):
                     eta_value / eta_value.abs().sum()
                     for eta_value in eta_values
                 ]
-
-                [
-                    env.predict(action.cpu().numpy(), agent_id=idx)
-                    for idx, action in enumerate(eta_values)
-                ]
-
+                for idx, agent in enumerate(agent_ls):
+                    action = agent.act(state, epsilon=0)
+                [env.predict(action.cpu().numpy(), agent_id=idx) for idx,action in enumerate(eta_values)]
+                
                 portfolio = torch.row_stack(eta_values).mean(axis=0)
                 portfolio /= portfolio.abs().sum()
                 portfolio += 1
@@ -272,9 +272,7 @@ def run_gym(params):
         make_agent(params, hidden_dims=(2**(6 + i), 2**(6 + i)))
         for i in range(params.agent_num)
     ]
-    
-    [agent.load(idx,'experiments/v1_10d_10') for idx,agent in enumerate(agent_ls)]
-    
+
     global_optimizer = optim.Adam([{
         'params': agent.q_network.parameters()
     } for agent in agent_ls],
@@ -343,10 +341,10 @@ def run_gym(params):
             ]
 
             test_agent(test_env, agent_ls, logger)
-
+            
             if ts > 50000:
                 test_portfolio(train_env, test_env, agent_ls, logger)
-
+               
             logger.info('------------------')
 
 
@@ -376,3 +374,31 @@ if __name__ == "__main__":
     parser.add_argument("--global_loss_scale", type=float, default=1)
 
     run_gym(parser.parse_args())
+
+Namespace(agent_num=4, batch_size=32, epsilon_decay=1000, epsilon_end=0.1, epsilon_start=1.0, gamma=0.9, global_loss_scale=1, gradient_step=1, hidden_dims=(256, 256), ic_scale=10.0, learning_rate=0.0001, log_every=1000, max_ts=1000000, replay_size=100000, reward_scale=1.0, save_dir='experiments/v1', start_train_ts=100, target_network_update_f=1000, target_update_rate=0.1, ts_window=10, update_every=1)
+init env:firstday:20100119 tradedays:2186,tickers:3599
+init env:firstday:20190102 tradedays:597,tickers:4400
+train
+0:  annret:-1.849,  sharpe:-0.060
+1:  annret:-1.846,  sharpe:-0.060
+2:  annret:-1.855,  sharpe:-0.060
+3:  annret:-1.844,  sharpe:-0.060
+portfolio:  annret:-0.359,  sharpe:-0.017
+                  0         1         2         3  portfolio
+0          1.000000  1.000000  1.000000  1.000000   0.738133
+1          1.000000  1.000000  1.000000  1.000000   0.738132
+2          1.000000  1.000000  1.000000  1.000000   0.738141
+3          1.000000  1.000000  1.000000  1.000000   0.738149
+portfolio  0.738133  0.738132  0.738141  0.738149   1.000000
+train
+0:  annret:-1.830,  sharpe:-0.059
+1:  annret:-1.836,  sharpe:-0.060
+2:  annret:-1.834,  sharpe:-0.060
+3:  annret:-1.832,  sharpe:-0.059
+portfolio:  annret:57.669,  sharpe:4.016
+                 0         1         2         3  portfolio
+0          1.00000  1.000000  1.000000  1.000000  -0.163630
+1          1.00000  1.000000  1.000000  1.000000  -0.163622
+2          1.00000  1.000000  1.000000  1.000000  -0.163628
+3          1.00000  1.000000  1.000000  1.000000  -0.163611
+portfolio -0.16363 -0.163622 -0.163628 -0.163611   1.000000

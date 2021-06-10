@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=0 python main.py --save_dir experiments/v1_20d_10 --ts_window 20 --ic_scale 10
